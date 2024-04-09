@@ -1,4 +1,5 @@
 package org.legendsayantan.data
 
-class Table {
-}
+import java.io.Serializable
+
+data class Table(val data: List<Array<String>>)

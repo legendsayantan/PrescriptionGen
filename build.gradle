@@ -11,6 +11,9 @@ repositories {
 
 dependencies {
     testImplementation 'org.jetbrains.kotlin:kotlin-test'
+
+    implementation 'org.apache.pdfbox:pdfbox:2.0.24'
+    implementation 'com.github.dhorions:boxable:1.7.0'
 }
 
 test {
