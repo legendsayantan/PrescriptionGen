@@ -1,53 +1,109 @@
 package org.legendsayantan
 
-import org.legendsayantan.Generator.PdfPrescription
-import org.legendsayantan.data.PdfData
-import org.legendsayantan.data.Table
+import data.fields.InputField
+import data.fields.TextField
+import data.PatientData
+import data.templates.TableTemplate
+import data.templates.TextTemplate
+import generator.PdfPrescription
+import org.legendsayantan.data.BasicData
+import org.legendsayantan.data.templates.ImageData
 
 fun main() {
-    val tableData = linkedMapOf<String, Table>()
-    tableData["Other History :"] = Table(
-        listOf(
-            arrayOf("Eye", "Right Eye", "Left Eye"),
-            arrayOf("Vision with/without glasses", "6/6", "6/6"),
-            arrayOf("Vision with PH", "6/6", "6/6"),
-            arrayOf("Lid & Adnexa", "6/6", "6/6"),
-            arrayOf("Anterior Segment", "6/6", "6/6"),
-            arrayOf("Posterior Segment", "6/6", "6/6"),
-            arrayOf("IOP", "6/6", "6/6"),
-            arrayOf("TBUT/Patency", "6/6", "6/6"),
+    //pdf format declaration
+    val newInput : ()->InputField = { InputField(options = listOf("1", "2", "3", "4", "5", "6")) }
+    val topText = TextTemplate(
+        name = "top",
+        content = linkedMapOf(
+            "C/o" to InputField(listOf("lack of vision")),
+            "Ocular History" to InputField(listOf("lack of vision")),
+            "Systemic History" to InputField(listOf("heart disease", "headache")),
         )
     )
-    tableData["Spectacle Correction :"] = Table(
-        listOf(
-            arrayOf("Eye", "Spherical", "Cylindrical", "Axis", "Vision"),
-            arrayOf("OD", "6/6", "6/6", "6/6", "6/6"),
-            arrayOf("OS", "6/6", "6/6", "6/6", "6/6"),
+    val topTable = TableTemplate(
+        name = "Other History",
+        content = listOf(
+            listOf(TextField("Eye"), TextField("Right Eye"), TextField("Left Eye")),
+            listOf(TextField("Vision with/without glasses"), newInput(), newInput()),
+            listOf(TextField("Vision with PH"), newInput(), newInput()),
+            listOf(TextField("Lid & Adnexa"), newInput(), newInput()),
+            listOf(TextField("Anterior Segment"), newInput(), newInput()),
+            listOf(TextField("Posterior Segment"), newInput(), newInput()),
+            listOf(TextField("IOP"), newInput(), newInput()),
+            listOf(TextField("TBUT/Patency"), newInput(), newInput()),
         )
     )
-    tableData["_1"] = Table(
-        listOf(
-            arrayOf("ADD", "ADD info here"),
-            arrayOf("Suggestions", "Take care of eyes"),
+    val midTable = TableTemplate(
+        name = "Spectacle Correction",
+        content = listOf(
+            listOf(
+                TextField("Eye"),
+                TextField("Spherical"),
+                TextField("Cylindrical"),
+                TextField("Axis"),
+                TextField("Vision")
+            ),
+            listOf(TextField("OD"), newInput(), newInput(), newInput(), newInput()),
+            listOf(TextField("OS"), newInput(), newInput(), newInput(), newInput()),
+            listOf(TextField("ADD"), newInput()),
+            listOf(TextField("Suggestion"), newInput()),
+        )
+    )
+    val bottomText = TextTemplate(
+        name = "bottom",
+        content = linkedMapOf(
+            "Advice" to InputField(listOf())
         )
     )
 
-    val data = PdfData(
-        "Sayantan Paul",
-        1,
-        PdfData.Sex.M,
-        1082946600000,
-        System.currentTimeMillis(),
-        linkedMapOf(
-            "C/o: " to "Headache",
-            "Ocular History: " to "Issues with eyes and ears and nose and throat",
-            "Systemic History: " to "Issues with everything else in the head region and also the neck region and also the shoulder region"
-        ),
-        tableData,
-        linkedMapOf("Advice: " to "Wear glasses everyday.")
+    //put data
+    val topData = topText.fillWith(
+        listOf(
+            "Dimness of Vision for distance and near",
+            "Spectacle wearing since 6 years",
+            "Thyroid-5 years"
+        )
     )
-    PdfPrescription("collegelogo-full.png") { err ->
-        println(err)
+    val table1 = topTable.fillWith(
+        listOf(
+            listOf("6", "6"),
+            listOf("6", "6"),
+            listOf("6", "6"),
+            listOf("6", "6"),
+            listOf("6", "6"),
+            listOf("6", "6"),
+            listOf("6", "6"),
+        )
+    )
+    val table2 = midTable.fillWith(
+        listOf(
+            listOf("1", "1", "2", "3"),
+            listOf("5", "3", "2", "1"),
+            listOf("0.5"),
+            listOf("Take care of eyes")
+        )
+    )
+    val footer = bottomText.fillWith(
+        listOf(
+            "Wear glasses everyday, and visit the doctor regularly. Do not forget to take your medicines on time."
+        )
+    )
+    val images = ImageData(
+        listOf("13487_1","13487_2")
+    )
+    val data = PatientData(
+        BasicData(
+            "Sayantan Paul",
+            13487,
+            BasicData.Sex.M,
+            1082946600000,
+        ),
+        System.currentTimeMillis(),
+        listOf(topData, table1, table2, footer, images)
+    )
+
+    PdfPrescription("collegelogo-full.png") {
+        println(it)
     }.createWith(data) {
         it.save("output.pdf")
     }
