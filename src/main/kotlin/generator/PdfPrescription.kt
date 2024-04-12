@@ -44,15 +44,21 @@ class PdfPrescription(val imagePath: String, val onError: (String) -> Unit) {
             // Start a content stream which will "hold" the to be created content
             PDPageContentStream(document, page).use { contentStream ->
                 var offset: Float
-                offset = addHeaderImage(document, contentStream, marginVertical,pdfData.basics)
-                offset = addNames(contentStream, offset, pdfData.basics,pdfData.lastVisit)
+                offset = addHeaderImage(document, contentStream, marginVertical, pdfData.basics)
+                offset = addNames(contentStream, offset, pdfData.basics, pdfData.lastVisit)
                 pdfData.contents.forEach {
-                    if(it is TextTemplate){
-                        offset = inflateHashMap(contentStream, offset, it.content)
-                    }else if (it is TableTemplate){
-                        offset = inflateTable(document, contentStream, it.name, it.content, offset)
-                    }else if(it is ImageData){
-                        offset = inflateImages(document,contentStream,it.name,it.imageIds,offset)
+                    when (it) {
+                        is TextTemplate -> {
+                            offset = inflateHashMap(contentStream, offset, it.content)
+                        }
+
+                        is TableTemplate -> {
+                            offset = inflateTable(document, contentStream, it.name, it.content, offset)
+                        }
+
+                        is ImageData -> {
+                            offset = inflateImages(document, contentStream, it.name, it.imageIds, offset)
+                        }
                     }
                 }
             }
@@ -62,20 +68,25 @@ class PdfPrescription(val imagePath: String, val onError: (String) -> Unit) {
         }
     }
 
-    private fun createQrCode(data:BasicData,size:Int){
+    private fun createQrCode(data: BasicData, size: Int) {
         val qrCodeWriter = QRCodeWriter()
-        val bitMatrix = qrCodeWriter.encode(Gson().toJson(data), BarcodeFormat.QR_CODE, size*5, size*5)
+        val bitMatrix = qrCodeWriter.encode(Gson().toJson(data), BarcodeFormat.QR_CODE, size * 5, size * 5)
         val path: Path = FileSystems.getDefault().getPath(qrCachePath)
         MatrixToImageWriter.writeToPath(bitMatrix, "PNG", path)
     }
 
-    private fun addHeaderImage(document: PDDocument, contentStream: PDPageContentStream, topOffset: Float,data:BasicData): Float {
+    private fun addHeaderImage(
+        document: PDDocument,
+        contentStream: PDPageContentStream,
+        topOffset: Float,
+        data: BasicData
+    ): Float {
         val image = ImageIO.read(File(imagePath))
         val scaling = (imageScale).coerceAtMost(
             (pageWidth - qrSize - (marginHorizontal * 2)) / image.width.toFloat()
         )
         val qrSize = image.height * scaling * 1.2f
-        createQrCode(data,image.height*scaling.toInt())
+        createQrCode(data, image.height * scaling.toInt())
         if (image != null) {
             val xOffset = marginHorizontal
             val yOffset = pageHeight - topOffset - image.height * scaling
@@ -87,9 +98,9 @@ class PdfPrescription(val imagePath: String, val onError: (String) -> Unit) {
                 image.height * scaling
             )
             contentStream.drawImage(
-                PDImageXObject.createFromFile(qrCachePath, document) ,
+                PDImageXObject.createFromFile(qrCachePath, document),
                 pageWidth - marginHorizontal - qrSize,
-                yOffset,
+                yOffset - 5f,
                 qrSize,
                 qrSize
             )
@@ -100,7 +111,7 @@ class PdfPrescription(val imagePath: String, val onError: (String) -> Unit) {
         }
     }
 
-    private fun addNames(contentStream: PDPageContentStream, topOffset: Float, pdfData: BasicData,date:Long): Float {
+    private fun addNames(contentStream: PDPageContentStream, topOffset: Float, pdfData: BasicData, date: Long): Float {
         val currentHeight = topOffset - 25f
 
         val h: Float = contentStream.putTextAt(
@@ -173,7 +184,7 @@ class PdfPrescription(val imagePath: String, val onError: (String) -> Unit) {
         )
 
         val evenCellWidth = tableWidth / (data.first().size * 4.5f)
-        val exactCellWidth = (data.maxOf { stringWidth(it[0].text) } / 3f).coerceAtLeast(tableWidth/4.5f - 100f)
+        val exactCellWidth = (data.maxOf { stringWidth(it[0].text) } / 3f).coerceAtLeast(tableWidth / 4.5f - 100f)
 
         data.forEach { array ->
             val row = table.createRow(lineHeight)
@@ -184,7 +195,7 @@ class PdfPrescription(val imagePath: String, val onError: (String) -> Unit) {
                         else (tableWidth / 4.5f - exactCellWidth)
                     else evenCellWidth, s.text
                 ).apply {
-                    font = if(s is TextField) Companion.fontBold else Companion.font
+                    font = if (s is TextField) Companion.fontBold else Companion.font
                     fontSize = Companion.fontSize
                     align = HorizontalAlignment.CENTER
                 }
@@ -197,28 +208,34 @@ class PdfPrescription(val imagePath: String, val onError: (String) -> Unit) {
 
     private fun inflateImages(
         document: PDDocument, contentStream: PDPageContentStream, name: String,
-        data: List<String>,
+        data: LinkedHashMap<String, String>,
         yOffset: Float
-    ):Float {
+    ): Float {
         var currentHeight = yOffset
         if (name.isNotEmpty() && !name.startsWith("_")) {
-            val x = contentStream.putTextAt("$name: ", "", marginHorizontal, currentHeight) - 10f
-            currentHeight -= if(imageRenderVertical) x else -10f
+            currentHeight -= contentStream.putTextAt("$name: ", "", marginHorizontal, currentHeight) - 10f
         }
-        val divider = marginHorizontal/2
-        val paths = data.map { ImageProvider.getImagePathFromID(it) }
-        val images = paths.map { ImageIO.read(File(it)) }
-        val totalImageWidth = paths.sumOf { ImageIO.read(File(it)).width } + divider*(paths.size-1)
+        val divider = marginHorizontal / 2
+        val paths = data.map { it.key to ImageProvider.getImagePathFromID(it.value) }
+        val images = paths.map { it.first to ImageIO.read(File(it.second)) }
+        val totalImageWidth = paths.sumOf { ImageIO.read(File(it.second)).width } + divider * (paths.size - 1)
         val scale = min(
-            (currentHeight - marginVertical) / images.maxOf { it.height }.toFloat(),
+            (currentHeight - marginVertical) / images.maxOf { it.second.height }.toFloat(),
             (pageWidth - (marginHorizontal * 2)) / totalImageWidth
         )
-        var xOffset = marginHorizontal + if(!imageRenderVertical) stringWidth("$name    ") else 0f
-        val y = currentHeight - images.maxOf { it.height } * scale
-        paths.forEachIndexed { index,image ->
-            val img = images[index]
+        var xOffset = ((pageWidth - (totalImageWidth * scale)) / 2).coerceAtLeast(marginHorizontal)
+        val y = currentHeight - images.maxOf { it.second.height } * scale
+        paths.forEachIndexed { index, module ->
+            val img = images[index].second
+            contentStream.putTextAt(
+                "",
+                module.first,
+                xOffset + (img.width * scale - stringWidth(module.first)) / 2,
+                yOffset,
+                maxLength = 100f
+            )
             contentStream.drawImage(
-                PDImageXObject.createFromFile(image, document),
+                PDImageXObject.createFromFile(module.second, document),
                 xOffset,
                 y,
                 img.width * scale,
@@ -238,7 +255,6 @@ class PdfPrescription(val imagePath: String, val onError: (String) -> Unit) {
         var paragraphSpacing = 5f
         const val pageHeight = 841.89f
         const val pageWidth = 595.28f
-        var imageRenderVertical = true
         fun PDPageContentStream.putTextAt(
             bold: String,
             normal: String,

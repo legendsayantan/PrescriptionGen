@@ -46,7 +46,7 @@ fun main() {
             listOf(TextField("OD"), newInput(), newInput(), newInput(), newInput()),
             listOf(TextField("OS"), newInput(), newInput(), newInput(), newInput()),
             listOf(TextField("ADD"), newInput()),
-            listOf(TextField("Suggestion"), newInput()),
+            listOf(TextField("Suggestion"), newInput())
         )
     )
     val bottomText = TextTemplate(
@@ -89,7 +89,10 @@ fun main() {
         )
     )
     val images = ImageData(
-        listOf("13487_1","13487_2")
+        linkedMapOf(
+            "Right Eye" to "13487_1",
+            "Left Eye" to "13487_2"
+        )
     )
     val data = PatientData(
         BasicData(
@@ -101,9 +104,10 @@ fun main() {
         System.currentTimeMillis(),
         listOf(topData, table1, table2, footer, images)
     )
-
     PdfPrescription("collegelogo-full.png") {
         println(it)
+    }.apply {
+        marginVertical = 50f
     }.createWith(data) {
         it.save("output.pdf")
     }
